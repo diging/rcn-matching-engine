@@ -20,6 +20,8 @@
 		<db.user></db.user>
 		<db.password></db.password>
 		
+		<hibernate.index.base></hibernate.index.base>
+		
 		<kafka.hosts>localhost:9092</kafka.hosts>
 		<log.level>debug</log.level>
 	</properties>
