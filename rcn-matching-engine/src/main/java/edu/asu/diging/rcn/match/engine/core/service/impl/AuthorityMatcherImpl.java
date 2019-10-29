@@ -141,6 +141,8 @@ public class AuthorityMatcherImpl implements AuthorityMatcher {
                                                 match.setCompareRecordId(matchedRecord.getId());
                                                 match.setOverallScore(scoreMatch(ne, entry, score));
                                                 match.setMatchedOn(OffsetDateTime.now());
+                                                match.setJobId(msg.getJobId());
+                                                match.setInitiator(msg.getInitiator());
                                                 matchManager.saveMatch(match);
                                             }
                                         }
