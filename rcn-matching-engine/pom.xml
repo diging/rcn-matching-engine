@@ -1,11 +1,13 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-  <modelVersion>4.0.0</modelVersion>
-  <groupId>edu.asu.diging</groupId>
-  <artifactId>rcn-matching-engine</artifactId>
-  <version>0.0.1-SNAPSHOT</version>
-  <packaging>war</packaging>
-  
-  <properties>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<groupId>edu.asu.diging</groupId>
+	<artifactId>rcn-matching-engine</artifactId>
+	<version>0.0.1-SNAPSHOT</version>
+	<packaging>war</packaging>
+
+	<properties>
 		<org.slf4j-version>1.7.5</org.slf4j-version>
 		<org.springframework-version>5.1.5.RELEASE</org.springframework-version>
 		<spring-security-version>5.1.4.RELEASE</spring-security-version>
@@ -19,13 +21,13 @@
 		<db.database.url></db.database.url>
 		<db.user></db.user>
 		<db.password></db.password>
-		
+
 		<hibernate.index.base></hibernate.index.base>
-		
+
 		<kafka.hosts>localhost:9092</kafka.hosts>
 		<log.level>debug</log.level>
 	</properties>
-	
+
 	<dependencyManagement>
 		<dependencies>
 			<dependency>
@@ -242,11 +244,17 @@
 			<version>2.10.0</version>
 		</dependency>
 
+		<!-- Apache Commons -->
 		<!-- https://mvnrepository.com/artifact/commons-fileupload/commons-fileupload -->
 		<dependency>
 			<groupId>commons-fileupload</groupId>
 			<artifactId>commons-fileupload</artifactId>
 			<version>1.4</version>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.commons</groupId>
+			<artifactId>commons-text</artifactId>
+			<version>1.8</version>
 		</dependency>
 
 		<!-- https://mvnrepository.com/artifact/javax.servlet/javax.servlet-api -->
@@ -258,7 +266,7 @@
 		</dependency>
 
 	</dependencies>
-	
+
 	<build>
 		<finalName>rcn-matching-engine</finalName>
 		<resources>

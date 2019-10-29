@@ -1,12 +1,19 @@
 package edu.asu.diging.rcn.match.engine.core.service.impl;
 
+import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import javax.annotation.PostConstruct;
 import javax.transaction.Transactional;
 
+import org.apache.commons.text.similarity.JaroWinklerDistance;
+import org.apache.commons.text.similarity.JaroWinklerSimilarity;
+import org.apache.commons.text.similarity.LevenshteinDistance;
 import org.hibernate.search.jpa.FullTextEntityManager;
 import org.hibernate.search.jpa.FullTextQuery;
 import org.hibernate.search.jpa.Search;
@@ -115,19 +122,25 @@ public class AuthorityMatcherImpl implements AuthorityMatcher {
                                     .onField("identity.nameEntries.parts.part").matching(name).createQuery();
 
                             FullTextQuery jpaQuery = fullTextEntityManager.createFullTextQuery(query, RecordImpl.class);
-                            List<RecordImpl> results = jpaQuery.getResultList();
+                            jpaQuery.setProjection(FullTextQuery.SCORE, FullTextQuery.THIS);
+                            List<Object[]> results = jpaQuery.getResultList();
 
-                            for (Record matchedRecord : results) {
+                            for (Object[] searchResult : results) {
+                                Record matchedRecord = (Record) searchResult[1];
+                                float score = (float) searchResult[0];
                                 if (matchedRecord.getDatasetId().equals(compareDataset.getId())) {
                                     for (NameEntry entry : matchedRecord.getIdentity().getNameEntries()) {
                                         for (NamePart part2 : entry.getParts()) {
                                             // this needs to be changed
                                             if (isSameType(part, part2)) {
                                                 Match match = new MatchImpl();
+                                                match.setLuceneScore(score);
                                                 match.setBaseDatasetId(baseDataset.getId());
                                                 match.setBaseRecordId(record.getId());
                                                 match.setCompareDatasetId(compareDataset.getId());
                                                 match.setCompareRecordId(matchedRecord.getId());
+                                                match.setOverallScore(scoreMatch(ne, entry, score));
+                                                match.setMatchedOn(OffsetDateTime.now());
                                                 matchManager.saveMatch(match);
                                             }
                                         }
@@ -166,5 +179,75 @@ public class AuthorityMatcherImpl implements AuthorityMatcher {
             return true;
         }
         return false;
+    }
+
+    private float scoreMatch(NameEntry entry1, NameEntry entry2, float luceneScore) {
+        float overallScore = luceneScore;
+        
+        Map<PartType, List<String>> nameParts1 = getNameParts(entry1);
+        Map<PartType, List<String>> nameParts2 = getNameParts(entry2);
+        
+        float lastNameSim = calculateSimilarity(nameParts1.get(PartType.LAST_NAME), nameParts2.get(PartType.LAST_NAME));
+        float firstNameSim = calculateSimilarity(nameParts1.get(PartType.FIRST_NAME), nameParts2.get(PartType.FIRST_NAME));
+        float orgNameSim = calculateSimilarity(nameParts1.get(PartType.ORG_NAME), nameParts2.get(PartType.ORG_NAME));
+        
+        if (orgNameSim > -1) {
+            return overallScore*orgNameSim;
+        }
+        
+        return overallScore * (lastNameSim * 0.8f) * (firstNameSim * 0.2f);
+    }
+    
+    private float calculateSimilarity(List<String> names1, List<String> names2) {
+        JaroWinklerSimilarity jSimilarity = new JaroWinklerSimilarity();
+        if (names1.isEmpty() || names2.isEmpty()) {
+            return -1;
+        }
+        float listSim = 0;
+        for(String name1 : names1) {
+            double sim = -1;
+            int idx = 0;
+            int matchIdx = 0;
+            for (String name2 : names2) {
+                double jSim = jSimilarity.apply(name1, name2);
+                if (jSim > sim) {
+                    sim = jSim;
+                    matchIdx = idx;
+                }
+                idx++;
+            }
+            listSim += sim;
+            if (names2.size() > matchIdx) {
+                names2.remove(matchIdx);
+            }
+        }
+        
+        return listSim;
+    }
+    
+    private Map<PartType, List<String>> getNameParts(NameEntry entry) {
+        Map<PartType, List<String>> nameParts = new HashMap<AuthorityMatcherImpl.PartType, List<String>>();
+        nameParts.put(PartType.FIRST_NAME, new ArrayList<>());
+        nameParts.put(PartType.LAST_NAME, new ArrayList<>());
+        nameParts.put(PartType.ORG_NAME, new ArrayList<>());
+        for (NamePart part : entry.getParts()) {
+            String partString = part.getPart();
+            List<String> partStringList = Arrays.asList(partString.split(" "));
+            if (isFirstName(part)) {
+                nameParts.get(PartType.FIRST_NAME).addAll(partStringList);
+            } else if (isLastName(part)) {
+                nameParts.get(PartType.LAST_NAME).addAll(partStringList);
+            } else if (isOrgName(part)) {
+                nameParts.get(PartType.ORG_NAME).addAll(partStringList);
+            }
+        }
+        return nameParts;
+    }
+    
+    
+    enum PartType {
+        FIRST_NAME,
+        LAST_NAME,
+        ORG_NAME;
     }
 }
