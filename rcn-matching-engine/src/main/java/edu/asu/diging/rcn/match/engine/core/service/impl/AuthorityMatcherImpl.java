@@ -1,19 +1,13 @@
 package edu.asu.diging.rcn.match.engine.core.service.impl;
 
 import java.time.OffsetDateTime;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 import javax.annotation.PostConstruct;
 import javax.transaction.Transactional;
 
-import org.apache.commons.text.similarity.JaroWinklerDistance;
-import org.apache.commons.text.similarity.JaroWinklerSimilarity;
-import org.apache.commons.text.similarity.LevenshteinDistance;
 import org.hibernate.search.jpa.FullTextEntityManager;
 import org.hibernate.search.jpa.FullTextQuery;
 import org.hibernate.search.jpa.Search;
@@ -25,14 +19,12 @@ import org.springframework.orm.jpa.JpaTransactionManager;
 import org.springframework.stereotype.Service;
 
 import edu.asu.diging.eaccpf.data.DatasetRepository;
-import edu.asu.diging.eaccpf.data.NameEntryRepository;
 import edu.asu.diging.eaccpf.data.RecordRepository;
 import edu.asu.diging.eaccpf.model.Dataset;
 import edu.asu.diging.eaccpf.model.NameEntry;
 import edu.asu.diging.eaccpf.model.NamePart;
 import edu.asu.diging.eaccpf.model.Record;
 import edu.asu.diging.eaccpf.model.impl.DatasetImpl;
-import edu.asu.diging.eaccpf.model.impl.NameEntryImpl;
 import edu.asu.diging.eaccpf.model.impl.RecordImpl;
 import edu.asu.diging.eaccpf.model.match.Match;
 import edu.asu.diging.eaccpf.model.match.impl.MatchImpl;
@@ -40,6 +32,7 @@ import edu.asu.diging.rcn.kafka.messages.model.KafkaMatchAuthoritiesJobMessage;
 import edu.asu.diging.rcn.match.engine.core.exception.DatasetDoesNotExistException;
 import edu.asu.diging.rcn.match.engine.core.service.AuthorityMatcher;
 import edu.asu.diging.rcn.match.engine.core.service.MatchManager;
+import edu.asu.diging.rcn.match.engine.core.service.MatchScorer;
 
 @Service
 @Transactional
@@ -50,9 +43,6 @@ public class AuthorityMatcherImpl implements AuthorityMatcher {
     private DatasetRepository datasetRepository;
 
     @Autowired
-    private NameEntryRepository nameEntryRepo;
-
-    @Autowired
     private RecordRepository recordRepo;
 
     @Autowired
@@ -60,6 +50,9 @@ public class AuthorityMatcherImpl implements AuthorityMatcher {
 
     @Autowired
     private JpaTransactionManager transactionManager;
+    
+    @Autowired
+    private MatchScorer scorer;
 
     @Value("${_last_name_local_types}")
     private String lastNameLocalTypes;
@@ -139,10 +132,14 @@ public class AuthorityMatcherImpl implements AuthorityMatcher {
                                                 match.setBaseRecordId(record.getId());
                                                 match.setCompareDatasetId(compareDataset.getId());
                                                 match.setCompareRecordId(matchedRecord.getId());
-                                                match.setOverallScore(scoreMatch(ne, entry, score));
                                                 match.setMatchedOn(OffsetDateTime.now());
                                                 match.setJobId(msg.getJobId());
                                                 match.setInitiator(msg.getInitiator());
+                                                
+                                                MatchScore matchScore = scorer.score(record, matchedRecord, ne, entry, score);
+                                                match.setNameScore(matchScore.getNameScore());
+                                                match.setDateScore(matchScore.getDateScore());
+                                                match.setOverallScore(matchScore.getOverallScore());
                                                 matchManager.saveMatch(match);
                                             }
                                         }
@@ -183,73 +180,5 @@ public class AuthorityMatcherImpl implements AuthorityMatcher {
         return false;
     }
 
-    private float scoreMatch(NameEntry entry1, NameEntry entry2, float luceneScore) {
-        float overallScore = luceneScore;
-        
-        Map<PartType, List<String>> nameParts1 = getNameParts(entry1);
-        Map<PartType, List<String>> nameParts2 = getNameParts(entry2);
-        
-        float lastNameSim = calculateSimilarity(nameParts1.get(PartType.LAST_NAME), nameParts2.get(PartType.LAST_NAME));
-        float firstNameSim = calculateSimilarity(nameParts1.get(PartType.FIRST_NAME), nameParts2.get(PartType.FIRST_NAME));
-        float orgNameSim = calculateSimilarity(nameParts1.get(PartType.ORG_NAME), nameParts2.get(PartType.ORG_NAME));
-        
-        if (orgNameSim > -1) {
-            return overallScore*orgNameSim;
-        }
-        
-        return overallScore * (lastNameSim * 0.8f) * (firstNameSim * 0.2f);
-    }
     
-    private float calculateSimilarity(List<String> names1, List<String> names2) {
-        JaroWinklerSimilarity jSimilarity = new JaroWinklerSimilarity();
-        if (names1.isEmpty() || names2.isEmpty()) {
-            return -1;
-        }
-        float listSim = 0;
-        for(String name1 : names1) {
-            double sim = -1;
-            int idx = 0;
-            int matchIdx = 0;
-            for (String name2 : names2) {
-                double jSim = jSimilarity.apply(name1, name2);
-                if (jSim > sim) {
-                    sim = jSim;
-                    matchIdx = idx;
-                }
-                idx++;
-            }
-            listSim += sim;
-            if (names2.size() > matchIdx) {
-                names2.remove(matchIdx);
-            }
-        }
-        
-        return listSim;
-    }
-    
-    private Map<PartType, List<String>> getNameParts(NameEntry entry) {
-        Map<PartType, List<String>> nameParts = new HashMap<AuthorityMatcherImpl.PartType, List<String>>();
-        nameParts.put(PartType.FIRST_NAME, new ArrayList<>());
-        nameParts.put(PartType.LAST_NAME, new ArrayList<>());
-        nameParts.put(PartType.ORG_NAME, new ArrayList<>());
-        for (NamePart part : entry.getParts()) {
-            String partString = part.getPart();
-            List<String> partStringList = Arrays.asList(partString.split(" "));
-            if (isFirstName(part)) {
-                nameParts.get(PartType.FIRST_NAME).addAll(partStringList);
-            } else if (isLastName(part)) {
-                nameParts.get(PartType.LAST_NAME).addAll(partStringList);
-            } else if (isOrgName(part)) {
-                nameParts.get(PartType.ORG_NAME).addAll(partStringList);
-            }
-        }
-        return nameParts;
-    }
-    
-    
-    enum PartType {
-        FIRST_NAME,
-        LAST_NAME,
-        ORG_NAME;
-    }
 }
