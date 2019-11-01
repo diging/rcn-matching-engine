@@ -128,6 +128,10 @@ public class NameUtility implements INameUtility {
         if (isOrgName(part1) && isOrgName(part2)) {
             return true;
         }
+        if (part1.getLocalType() != null && part2.getLocalType() != null
+                && part1.getLocalType().equals(part2.getLocalType())) {
+            return true;
+        }
         return false;
     }
 }
