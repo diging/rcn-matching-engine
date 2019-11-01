@@ -17,6 +17,9 @@
 
 		<admin.password>$2a$04$oQo44vqcDIFRoYKiAXoNheurzkwX9dcNmowvTX/hsWuBMwijqn44i</admin.password>
 
+		<diging.rcn.model.version>0.1</diging.rcn.model.version>
+		<diging.rcn.kafka.messages>0.1</diging.rcn.kafka.messages>
+
 		<db.driver>com.mysql.jdbc.Driver</db.driver>
 		<db.database.url></db.database.url>
 		<db.user></db.user>
@@ -26,6 +29,11 @@
 
 		<kafka.hosts>localhost:9092</kafka.hosts>
 		<log.level>debug</log.level>
+		
+		<tomcat.deploy.path></tomcat.deploy.path>
+		<tomcat.app.name>authmatcher</tomcat.app.name>
+		<tomcat.server.id>TomcatServer</tomcat.server.id>
+		
 	</properties>
 
 	<dependencyManagement>
@@ -53,7 +61,7 @@
 		<dependency>
 			<groupId>edu.asu.diging</groupId>
 			<artifactId>rcn-model</artifactId>
-			<version>0.0.1-SNAPSHOT</version>
+			<version>${diging.rcn.model.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>edu.asu.diging</groupId>
@@ -63,7 +71,7 @@
 		<dependency>
 			<groupId>edu.asu.diging</groupId>
 			<artifactId>rcn-kafka-messages</artifactId>
-			<version>0.1-SNAPSHOT</version>
+			<version>${diging.rcn.kafka.messages}</version>
 		</dependency>
 		<dependency>
 			<groupId>edu.asu.diging</groupId>
@@ -308,6 +316,16 @@
 				<configuration>
 					<source>1.8</source>
 					<target>1.8</target>
+				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.tomcat.maven</groupId>
+				<artifactId>tomcat7-maven-plugin</artifactId>
+				<version>2.2</version>
+				<configuration>
+					<url>${tomcat.deploy.path}</url>
+					<server>${tomcat.server.id}</server>
+					<path>/${tomcat.app.name}</path>
 				</configuration>
 			</plugin>
 		</plugins>
