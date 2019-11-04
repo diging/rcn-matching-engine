@@ -31,7 +31,7 @@
 		<log.level>debug</log.level>
 		
 		<tomcat.deploy.path></tomcat.deploy.path>
-		<tomcat.app.name>authmatcher</tomcat.app.name>
+		<tomcat.app.name>auth-matching-engine</tomcat.app.name>
 		<tomcat.server.id>TomcatServer</tomcat.server.id>
 		
 	</properties>
