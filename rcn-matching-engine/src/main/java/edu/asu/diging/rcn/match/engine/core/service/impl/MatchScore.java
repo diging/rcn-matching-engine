@@ -5,6 +5,7 @@ public class MatchScore {
     private float nameScore;
     private float dateScore;
     private float overallScore;
+    private float bioScore;
 
     public float getNameScore() {
         return nameScore;
@@ -28,5 +29,13 @@ public class MatchScore {
 
     public void setOverallScore(float overallScore) {
         this.overallScore = overallScore;
+    }
+
+    public float getBioScore() {
+        return bioScore;
+    }
+
+    public void setBioScore(float bioScore) {
+        this.bioScore = bioScore;
     }
 }

@@ -59,6 +59,8 @@ public class KafkaConfig {
         // consumer groups allow a pool of processes to divide the work of
         // consuming and processing records
         props.put(ConsumerConfig.GROUP_ID_CONFIG, consumerGroup);
+        props.put(ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG, 3500000);
+        props.put(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, 3500000);
 
         return props;
     }

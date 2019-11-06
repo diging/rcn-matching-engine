@@ -14,10 +14,11 @@
 		<spring-data.version>Lovelace-RELEASE</spring-data.version>
 		<thymeleaf.version>3.0.11.RELEASE</thymeleaf.version>
 		<spring.kafka.version>2.2.8.RELEASE</spring.kafka.version>
+		<lucene.version>5.5.5</lucene.version>
 
 		<admin.password>$2a$04$oQo44vqcDIFRoYKiAXoNheurzkwX9dcNmowvTX/hsWuBMwijqn44i</admin.password>
 
-		<diging.rcn.model.version>0.1</diging.rcn.model.version>
+		<diging.rcn.model.version>0.2</diging.rcn.model.version>
 		<diging.rcn.kafka.messages>0.1</diging.rcn.kafka.messages>
 
 		<db.driver>com.mysql.jdbc.Driver</db.driver>
@@ -29,11 +30,11 @@
 
 		<kafka.hosts>localhost:9092</kafka.hosts>
 		<log.level>debug</log.level>
-		
+
 		<tomcat.deploy.path></tomcat.deploy.path>
-		<tomcat.app.name>authmatcher</tomcat.app.name>
+		<tomcat.app.name>auth-matching-engine</tomcat.app.name>
 		<tomcat.server.id>TomcatServer</tomcat.server.id>
-		
+
 	</properties>
 
 	<dependencyManagement>
@@ -271,6 +272,50 @@
 			<artifactId>javax.servlet-api</artifactId>
 			<version>3.1.0</version>
 			<scope>provided</scope>
+		</dependency>
+
+		<dependency>
+			<groupId>edu.stanford.nlp</groupId>
+			<artifactId>stanford-corenlp</artifactId>
+			<version>3.9.2</version>
+		</dependency>
+		<dependency>
+			<groupId>edu.stanford.nlp</groupId>
+			<artifactId>stanford-corenlp</artifactId>
+			<version>3.9.2</version>
+			<classifier>models</classifier>
+		</dependency>
+		<!-- https://mvnrepository.com/artifact/org.apache.lucene/lucene-analyzers-common -->
+		<dependency>
+			<groupId>org.apache.lucene</groupId>
+			<artifactId>lucene-analyzers-common</artifactId>
+			<version>${lucene.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.lucene</groupId>
+			<artifactId>lucene-core</artifactId>
+			<version>${lucene.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.lucene</groupId>
+			<artifactId>lucene-queries</artifactId>
+			<version>${lucene.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.lucene</groupId>
+			<artifactId>lucene-queryparser</artifactId>
+			<version>${lucene.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.lucene</groupId>
+			<artifactId>lucene-sandbox</artifactId>
+			<version>${lucene.version}</version>
+		</dependency>
+		
+		<dependency>
+			<groupId>info.debatty</groupId>
+			<artifactId>java-string-similarity</artifactId>
+			<version>1.2.1</version>
 		</dependency>
 
 	</dependencies>
