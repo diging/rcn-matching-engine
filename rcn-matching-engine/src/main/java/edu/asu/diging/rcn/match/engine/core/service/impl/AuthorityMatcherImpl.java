@@ -11,6 +11,8 @@ import org.hibernate.search.jpa.FullTextEntityManager;
 import org.hibernate.search.jpa.FullTextQuery;
 import org.hibernate.search.jpa.Search;
 import org.hibernate.search.query.dsl.QueryBuilder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.PropertySource;
 import org.springframework.orm.jpa.JpaTransactionManager;
@@ -40,6 +42,8 @@ import edu.asu.diging.rcn.match.engine.core.service.MatchScorer;
 @Transactional
 @PropertySource("classpath:/config.properties")
 public class AuthorityMatcherImpl implements AuthorityMatcher {
+
+    private final Logger logger = LoggerFactory.getLogger(getClass());
 
     @Autowired
     private DatasetRepository datasetRepository;
@@ -89,81 +93,92 @@ public class AuthorityMatcherImpl implements AuthorityMatcher {
                 .forEntity(RecordImpl.class).get();
 
         recordRepo.getByDataset(baseDataset.getId()).forEach(record -> {
+            logger.debug("Matching " + record.getId());
+
             if (record.getIdentity() != null && record.getIdentity().getNameEntries() != null) {
                 record.getIdentity().getNameEntries().forEach(ne -> {
-                    List<NamePart> parts = ne.getParts();
-                    if (parts != null) {
-                        for (NamePart part : parts) {
-                            if (nameUtility.isFirstName(part)) {
-                                continue;
-                            }
+                    if (ne.getScriptCode() == null || ne.getScriptCode().trim().isEmpty()
+                            || ne.getScriptCode().trim().toLowerCase().equals("latn")) {
+                        List<NamePart> parts = ne.getParts();
+                        if (parts != null) {
+                            for (NamePart part : parts) {
+                                if (nameUtility.isFirstName(part)) {
+                                    continue;
+                                }
 
-                            String name = part.getPart();
-                            org.apache.lucene.search.Query query = queryBuilder.keyword().fuzzy()
-                                    .onField("identity.nameEntries.parts.part").matching(name).createQuery();
+                                String name = part.getPart();
+                                org.apache.lucene.search.Query query = queryBuilder.keyword().fuzzy()
+                                        .onField("identity.nameEntries.parts.part").matching(name).createQuery();
 
-                            FullTextQuery jpaQuery = fullTextEntityManager.createFullTextQuery(query, RecordImpl.class);
-                            jpaQuery.setProjection(FullTextQuery.SCORE, FullTextQuery.THIS);
-                            List<Object[]> results = jpaQuery.getResultList();
+                                FullTextQuery jpaQuery = fullTextEntityManager.createFullTextQuery(query,
+                                        RecordImpl.class);
+                                jpaQuery.setProjection(FullTextQuery.SCORE, FullTextQuery.THIS);
+                                List<Object[]> results = jpaQuery.getResultList();
 
-                            for (Object[] searchResult : results) {
-                                Record matchedRecord = (Record) searchResult[1];
-                                float score = (float) searchResult[0];
-                                if (matchedRecord.getDatasetId().equals(compareDataset.getId())) {
-                                    for (NameEntry entry : matchedRecord.getIdentity().getNameEntries()) {
-                                        for (NamePart part2 : entry.getParts()) {
-                                            // this needs to be changed
-                                            if (nameUtility.isSameType(part, part2)) {
-                                                MatchScore matchScore = scorer.score(record, matchedRecord, ne, entry,
-                                                        score);
-                                                if (matchScore.getOverallScore() > 0.1) {
-                                                    Match match = new MatchImpl();
-                                                    match.setLuceneScore(score);
-                                                    match.setBaseDatasetId(baseDataset.getId());
-                                                    match.setBaseRecordId(record.getId());
-                                                    match.setCompareDatasetId(compareDataset.getId());
-                                                    match.setCompareRecordId(matchedRecord.getId());
-                                                    match.setMatchedOn(OffsetDateTime.now());
-                                                    match.setJobId(msg.getJobId());
-                                                    match.setInitiator(msg.getInitiator());
+                                for (Object[] searchResult : results) {
+                                    Record matchedRecord = (Record) searchResult[1];
+                                    float score = (float) searchResult[0];
+                                    if (matchedRecord.getDatasetId().equals(compareDataset.getId())) {
+                                        for (NameEntry entry : matchedRecord.getIdentity().getNameEntries()) {
+                                            for (NamePart part2 : entry.getParts()) {
+                                                // this needs to be changed
+                                                if (nameUtility.isSameType(part, part2)) {
 
-                                                    match.setNameScore(matchScore.getNameScore());
-                                                    match.setDateScore(matchScore.getDateScore());
-                                                    match.setOverallScore(matchScore.getOverallScore());
-                                                    matchManager.saveMatch(match);
+                                                    MatchScore matchScore = scorer.score(record, matchedRecord, ne,
+                                                            entry, score);
+                                                    if (matchScore.getOverallScore() > 0.1) {
+                                                        Match match = new MatchImpl();
+                                                        match.setLuceneScore(score);
+                                                        match.setBaseDatasetId(baseDataset.getId());
+                                                        match.setBaseRecordId(record.getId());
+                                                        match.setCompareDatasetId(compareDataset.getId());
+                                                        match.setCompareRecordId(matchedRecord.getId());
+                                                        match.setMatchedOn(OffsetDateTime.now());
+                                                        match.setJobId(msg.getJobId());
+                                                        match.setInitiator(msg.getInitiator());
 
-                                                    MasterMatch master = masterMatchRepo.findFirstByJobIdAndRecordId(
-                                                            msg.getJobId(), record.getId());
-                                                    if (master == null) {
-                                                        master = new MasterMatchImpl();
-                                                        master.setJobId(msg.getJobId());
-                                                        master.setDatasetId(baseDataset.getId());
-                                                        master.setRecordId(record.getId());
-                                                        master.setMatchedDatasetId(compareDataset.getId());
-                                                        master.setMatchedRecordId(matchedRecord.getId());
-                                                        master.setMatches(new ArrayList<Match>());
+                                                        match.setNameScore(matchScore.getNameScore());
+                                                        match.setDateScore(matchScore.getDateScore());
+                                                        match.setBioScore(matchScore.getBioScore());
+                                                        match.setOverallScore(matchScore.getOverallScore());
+                                                        matchManager.saveMatch(match);
+
+                                                        MasterMatch master = masterMatchRepo
+                                                                .findFirstByJobIdAndRecordId(msg.getJobId(),
+                                                                        record.getId());
+                                                        if (master == null) {
+                                                            master = new MasterMatchImpl();
+                                                            master.setJobId(msg.getJobId());
+                                                            master.setDatasetId(baseDataset.getId());
+                                                            master.setRecordId(record.getId());
+                                                            master.setMatchedDatasetId(compareDataset.getId());
+                                                            master.setMatchedRecordId(matchedRecord.getId());
+                                                            master.setMatches(new ArrayList<Match>());
+                                                        }
+                                                        if (master.getScore() < match.getOverallScore()) {
+                                                            master.setNamePart1(nameUtility.getPrimayName(ne));
+                                                            master.setNamePart2(nameUtility.getSecondaryName(ne));
+                                                            master.setScore(match.getOverallScore());
+                                                            master.setMaster(match);
+                                                        }
+                                                        master.getMatches().add(match);
+                                                        masterMatchRepo.save((MasterMatchImpl) master);
                                                     }
-                                                    if (master.getScore() < match.getOverallScore()) {
-                                                        master.setNamePart1(nameUtility.getPrimayName(ne));
-                                                        master.setNamePart2(nameUtility.getSecondaryName(ne));
-                                                        master.setScore(match.getOverallScore());
-                                                        master.setMaster(match);
-                                                    }
-                                                    master.getMatches().add(match);
-                                                    masterMatchRepo.save((MasterMatchImpl) master);
                                                 }
                                             }
                                         }
                                     }
                                 }
-                            }
 
+                            }
                         }
                     }
+
                 });
             }
         });
 
+        logger.info("Done matching authorities.");
     }
 
 }
