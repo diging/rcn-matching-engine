@@ -18,7 +18,7 @@
 
 		<admin.password>$2a$04$oQo44vqcDIFRoYKiAXoNheurzkwX9dcNmowvTX/hsWuBMwijqn44i</admin.password>
 
-		<diging.rcn.model.version>0.2-SNAPSHOT</diging.rcn.model.version>
+		<diging.rcn.model.version>0.2</diging.rcn.model.version>
 		<diging.rcn.kafka.messages>0.1</diging.rcn.kafka.messages>
 
 		<db.driver>com.mysql.jdbc.Driver</db.driver>

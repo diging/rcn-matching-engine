@@ -19,13 +19,17 @@ import org.springframework.context.annotation.PropertySource;
 import org.springframework.stereotype.Service;
 
 import edu.asu.diging.eaccpf.model.BiogHist;
+import edu.asu.diging.eaccpf.model.CpfRelation;
 import edu.asu.diging.eaccpf.model.Date;
 import edu.asu.diging.eaccpf.model.DateRange;
 import edu.asu.diging.eaccpf.model.Description;
 import edu.asu.diging.eaccpf.model.ExistDates;
+import edu.asu.diging.eaccpf.model.Identity;
 import edu.asu.diging.eaccpf.model.NameEntry;
 import edu.asu.diging.eaccpf.model.NamePart;
 import edu.asu.diging.eaccpf.model.Record;
+import edu.asu.diging.eaccpf.model.RelationEntry;
+import edu.asu.diging.eaccpf.model.Relations;
 import edu.asu.diging.rcn.match.engine.core.service.MatchScorer;
 import edu.asu.diging.rcn.match.engine.core.service.NlpScorer;
 
@@ -34,6 +38,8 @@ import edu.asu.diging.rcn.match.engine.core.service.NlpScorer;
 public class MatchScorerImpl implements MatchScorer {
 
     private final Logger logger = LoggerFactory.getLogger(getClass());
+
+    private final String RELATION_TYPE_IDENTITY = "identity";
 
     @Autowired
     private NlpScorer nlpScorer;
@@ -141,6 +147,11 @@ public class MatchScorerImpl implements MatchScorer {
             parseDates(dates2.getDates(), ranges1);
         }
 
+        String identityText1 = getRelationsIdentityText(record1.getRelations());
+        String identityText2 = getRelationsIdentityText(record2.getRelations());
+        parseDatesInIdentityText(identityText1, ranges1);
+        parseDatesInIdentityText(identityText2, ranges2);
+
         if (ranges1.isEmpty() || ranges2.isEmpty()) {
             return -1;
         }
@@ -187,6 +198,27 @@ public class MatchScorerImpl implements MatchScorer {
             return totalScore / nrOfYearsMatched;
         }
         return -1;
+    }
+
+    private String getRelationsIdentityText(List<Relations> relations1) {
+        String identityText1 = null;
+        if (relations1 != null) {
+            for (Relations rels : relations1) {
+                if (rels.getCpfRelations() != null) {
+                    StringBuffer sb = new StringBuffer();
+                    for (CpfRelation cpfRel : rels.getCpfRelations()) {
+                        if (cpfRel.getCpfRelationType().equals(RELATION_TYPE_IDENTITY)
+                                && cpfRel.getRelationEntries() != null) {
+                            for (RelationEntry entry : cpfRel.getRelationEntries()) {
+                                sb.append(entry.getText() + "\n");
+                            }
+                        }
+                    }
+                    identityText1 = sb.toString();
+                }
+            }
+        }
+        return identityText1;
     }
 
     private float scoreBiography(Record record1, Record record2) {
@@ -298,6 +330,32 @@ public class MatchScorerImpl implements MatchScorer {
                     yearRange.to = findYear(toDate);
                 }
                 years.add(yearRange);
+            }
+        }
+    }
+
+    private void parseDatesInIdentityText(String text, List<YearRange> years) {
+        if (text != null) {
+            Pattern pattern = Pattern.compile("\\(([0-9]{4}) ?- ?([0-9]{2,4})?\\)");
+            Matcher matcher = pattern.matcher(text);
+            if (matcher.find()) {
+                String startYear = matcher.group(1);
+                String endYear = matcher.group(2);
+
+                if (startYear != null && endYear != null && endYear.length() == 2) {
+                    endYear = startYear.substring(0, 2) + endYear;
+                }
+
+                if (startYear != null || endYear != null) {
+                    YearRange range = new YearRange();
+                    if (startYear != null) {
+                        range.from = new Integer(startYear);
+                    }
+                    if (endYear != null) {
+                        range.to = new Integer(endYear);
+                    }
+                    years.add(range);
+                }
             }
         }
     }
